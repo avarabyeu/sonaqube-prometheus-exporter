@@ -1,0 +1,68 @@
+linters-settings:
+  govet:
+    check-shadowing: true
+  golint:
+    min-confidence: 0.8
+  gocyclo:
+    min-complexity: 10
+    max-complexity: 12
+  maligned:
+    suggest-new: true
+  dupl:
+    threshold: 500
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  misspell:
+    locale: US
+  lll:
+    line-length: 160
+  goimports:
+    local-prefixes: github.com/avarabyeu/sonarqube-prometheus-exporter
+  gocritic:
+    enabled-tags:
+      - performance
+      - style
+      - experimental
+    disabled-checks:
+      - wrapperFunc
+      - commentFormatting
+      - yodaStyleExpr
+      - unnamedResult
+      - commentedOutCode
+      - assignOp
+      - docStub
+      - whyNoLint
+
+linters:
+  enable-all: true
+  disable:
+    - prealloc
+    - gochecknoglobals
+    - gocyclo
+    #    - gocritic
+    - interfacer
+    - wsl
+    - funlen
+    - unused
+    - gomnd
+    #    - maligned
+    - goerr113
+    - godot
+    - nestif
+    - nlreturn
+    - sqlclosecheck
+    - exhaustive
+    - gci
+    - exhaustivestruct
+    - godox
+    - gochecknoglobals
+
+run:
+  concurrency: 1
+  tests: false
+  skip-dirs:
+    - tests
+
+service:
+  golangci-lint-version: 1.32.x
