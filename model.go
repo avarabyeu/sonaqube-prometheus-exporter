@@ -25,7 +25,7 @@ type ComponentInfo struct {
 
 type Component struct {
 	ComponentInfo
-	Description    string    `json:"key,omitempty"`
+	Description    string    `json:"description,omitempty"`
 	AnalysisDate   sonarDate `json:"analysisDate,omitempty"`
 	Tags           []string  `json:"tags,omitempty"`
 	Visibility     string    `json:"visibility,omitempty"`

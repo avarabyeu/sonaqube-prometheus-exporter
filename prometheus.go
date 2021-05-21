@@ -5,12 +5,16 @@ import (
 	"log"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var unsupportedTypes = map[string]struct{}{"DATA": {}}
+var (
+	unsupportedTypes = map[string]struct{}{"DATA": {}}
+	promNamePattern  = regexp.MustCompile("[^a-zA-Z_:]")
+)
 
 type PrometheusExporter struct {
 	metrics map[string]*promMetric
@@ -29,9 +33,12 @@ func NewPrometheusExporter() *PrometheusExporter {
 	}
 }
 
-func (pe *PrometheusExporter) Init(component string, metrics []*Metric, labels map[string]string) error {
-	r := regexp.MustCompile("[^a-zA-Z_:]")
-	compName := r.ReplaceAllString(component, "_")
+func (pe *PrometheusExporter) Init(component *Component, metrics []*Metric) ([]string, error) {
+	// metric names
+	var mNames []string
+
+	compName := pe.cleanupName(component.Key)
+	labels := pe.tagsToLabels(component.Tags)
 	for _, m := range metrics {
 		if _, unsupported := unsupportedTypes[m.Type]; unsupported {
 			continue
@@ -45,14 +52,16 @@ func (pe *PrometheusExporter) Init(component string, metrics []*Metric, labels m
 				ConstLabels: labels,
 			})
 		if err := prometheus.Register(pMetric); err != nil {
-			return fmt.Errorf("unable to register metric: %w", err)
+			return nil, fmt.Errorf("unable to register metric: %w", err)
 		}
 		pe.metrics[m.Key] = &promMetric{
 			metric:     &pMetric,
 			metricType: m.Type,
 		}
+		mNames = append(mNames, m.Key)
 	}
-	return nil
+
+	return mNames, nil
 }
 
 func (pe *PrometheusExporter) Run(measures *Measures) error {
@@ -67,7 +76,7 @@ func (pe *PrometheusExporter) Run(measures *Measures) error {
 			continue
 		}
 
-		val, err := getFloatValue(pMetric.metricType, measure)
+		val, err := pe.getFloatValue(pMetric.metricType, measure)
 		if err != nil {
 			log.Printf("Unable to convert metric: %s[%s]", measure.Metric, measure.Value)
 
@@ -78,7 +87,7 @@ func (pe *PrometheusExporter) Run(measures *Measures) error {
 	return nil
 }
 
-func getFloatValue(mType string, measure *Measure) (fVar float64, err error) {
+func (pe *PrometheusExporter) getFloatValue(mType string, measure *Measure) (fVar float64, err error) {
 	var strVal string
 	if measure.Value != "" {
 		strVal = measure.Value
@@ -99,6 +108,25 @@ func getFloatValue(mType string, measure *Measure) (fVar float64, err error) {
 		fVar, err = strconv.ParseFloat(strVal, 64)
 	}
 	return
+}
+
+func (pe *PrometheusExporter) cleanupName(n string) string {
+	return promNamePattern.ReplaceAllString(n, "_")
+}
+
+// tagsToLabels converts Sonar's project tags to Prometheus's labels
+// tags are supposed to be separated with separator, e.g. key#value
+func (pe *PrometheusExporter) tagsToLabels(tags []string) map[string]string {
+	labels := map[string]string{}
+	if labelSeparator != "" {
+		for _, tag := range tags {
+			parts := strings.Split(tag, labelSeparator)
+			if len(parts) == 2 {
+				labels[pe.cleanupName(parts[0])] = parts[1]
+			}
+		}
+	}
+	return labels
 }
 
 // nolint:deadcode

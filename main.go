@@ -8,11 +8,9 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -29,19 +27,21 @@ var (
 	buildDate   = "unknown"
 
 	versionCmd bool
+	helpCmd    bool
 )
 
 // nolint:gochecknoinits
 func init() {
 	flag.IntVar(&port, "port", 8080, "Exporter port")
 	flag.DurationVar(&scrapeTimeout, "scrape-timeout", 1*time.Minute, "Metrics scraper timeout")
-	flag.StringVar(&sonarURL, "url", "", "Sonarqube URL")
-	flag.StringVar(&sonarUser, "user", "", "Sonarqube User")
-	flag.StringVar(&sonarPassword, "password", "", "Sonarqube Password")
+	flag.StringVar(&sonarURL, "url", "", "Required. Sonarqube URL")
+	flag.StringVar(&sonarUser, "user", "", "Required. Sonarqube User")
+	flag.StringVar(&sonarPassword, "password", "", "Required. Sonarqube Password")
 	flag.StringVar(&labelSeparator, "label-separator", "#", "Label Separator. For instance, "+
 		"for Sonar with Label 'key#value', Prometheus attribute {project=\"my-project-name\"}")
 
 	flag.BoolVar(&versionCmd, "version", false, "Show version")
+	flag.BoolVar(&helpCmd, "help", false, "Show help")
 
 	flag.Parse()
 
@@ -49,6 +49,15 @@ func init() {
 		fmt.Printf("Git Revision: %s\n", gitRevision)
 		fmt.Printf("UTC Build Date: %s\n", buildDate)
 		os.Exit(0)
+	}
+	if helpCmd {
+		flag.Usage()
+		os.Exit(0)
+	}
+
+	if sonarURL == "" || sonarUser == "" || sonarPassword == "" {
+		flag.Usage()
+		log.Fatal("make sure all required flags are provided")
 	}
 }
 
@@ -83,14 +92,6 @@ func main() {
 	}
 }
 
-func getMetricNames(metrics []*Metric) []string {
-	names := make([]string, len(metrics))
-	for i, m := range metrics {
-		names[i] = m.Key
-	}
-	return names
-}
-
 func initMetrics(done <-chan struct{}) {
 	sonar := NewSonarClient(sonarURL, sonarUser, sonarPassword)
 	components, err := sonar.GetComponents()
@@ -104,29 +105,19 @@ func initMetrics(done <-chan struct{}) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		metrics, err := sonar.GetMetrics()
+		allMetrics, err := sonar.GetMetrics()
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		labels := map[string]string{}
-		if labelSeparator != "" {
-			for _, tag := range component.Tags {
-				parts := strings.Split(tag, labelSeparator)
-				if len(parts) == 2 {
-					labels[parts[0]] = parts[1]
-				}
-			}
-		}
-
 		exp := NewPrometheusExporter()
-		if err := exp.Init(componentKey, metrics, labels); err != nil {
+		metrics, err := exp.Init(component, allMetrics)
+		if err != nil {
 			log.Fatal(err)
 		}
 
-		mNames := getMetricNames(metrics)
 		schedule(done, 0, scrapeTimeout, func() error {
-			measures, err := sonar.GetMeasures(componentKey, mNames)
+			measures, err := sonar.GetMeasures(componentKey, metrics)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -148,10 +139,10 @@ func schedule(done <-chan struct{}, initialDelay, timeout time.Duration, callbac
 		case <-attemptTimer:
 			err = callback()
 			if err != nil {
-				logrus.Errorf("Scheduler error: %v", err)
+				log.Printf("Scheduler error: %v\n", err)
 			}
 			attemptTimer = time.After(timeout)
-			logrus.Trace("Scheduler job run successfully")
+			log.Println("Scheduler job run successfully")
 		}
 	}
 }

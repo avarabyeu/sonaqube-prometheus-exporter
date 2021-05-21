@@ -22,4 +22,4 @@ RUN apk add --no-cache tzdata ca-certificates
 WORKDIR /app
 COPY --from=builder /app/bin/ /app/
 
-CMD ["/app/sonarqube-prometheus-exporter"]
+ENTRYPOINT ["/app/sonarqube-prometheus-exporter"]
