@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sonarqube-prometheus-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sonarqube-prometheus-exporter
+  template:
+    metadata:
+      labels:
+        app: sonarqube-prometheus-exporter
+    spec:
+      containers:
+        - image: getcarrier/galloper:sqlite
+          name: exporter
+          command:
+            - -port 8080
+            - -url <sonar-url>
+            - -user <sonar-user>
+            - -password <sonar-password>
+      restartPolicy: Always
