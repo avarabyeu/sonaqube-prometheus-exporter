@@ -21,18 +21,14 @@ lint:
 
 fmt:
 	gofumpt -extra -l -w -s ${GOFILES_NOVENDOR}
-	gofumports -local github.com/avarabyeu/sonarqube-prometheus-exporter -l -w ${GOFILES_NOVENDOR}
-	gci -local github.com/avarabyeu/sonarqube-prometheus-exporter -w ${GOFILES_NOVENDOR}
+	gofumports -local github.com/fleetframework/sonarqube-prometheus-exporter -l -w ${GOFILES_NOVENDOR}
+	gci -local github.com/fleetframework/sonarqube-prometheus-exporter -w ${GOFILES_NOVENDOR}
 
 test:
 	$(GO) test ${GODIRS_NOVENDOR}
 
 build-image: build
 	DOCKER_BUILDKIT=1 docker build -t sonarqube-prometheus-exporter .
-
-release-image: build-image
-	DOCKER_BUILDKIT=1 docker tag sonarqube-prometheus-exporter:latest quay.io/avarabyeu/sonarqube-prometheus-exporter
-	DOCKER_BUILDKIT=1 docker push quay.io/avarabyeu/sonarqube-prometheus-exporter
 
 run:
 	realize start

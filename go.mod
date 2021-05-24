@@ -1,4 +1,4 @@
-module github.com/avarabyeu/sonarqube-prometheus-exporter
+module github.com/fleetframework/sonarqube-prometheus-exporter
 
 go 1.16
 

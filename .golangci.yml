@@ -18,7 +18,7 @@ linters-settings:
   lll:
     line-length: 160
   goimports:
-    local-prefixes: github.com/avarabyeu/sonarqube-prometheus-exporter
+    local-prefixes: github.com/fleetframework/sonarqube-prometheus-exporter
   gocritic:
     enabled-tags:
       - performance

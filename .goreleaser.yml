@@ -44,8 +44,8 @@ dockers:
 
     # Templates of the Docker image names.
     image_templates:
-      - "ghcr.io/avarabyeu/sonarqube-prometheus-exporter:latest"
-      - "ghcr.io/avarabyeu/sonarqube-prometheus-exporter:{{ .Tag }}"
+      - "ghcr.io/fleetframework/sonarqube-prometheus-exporter:latest"
+      - "ghcr.io/fleetframework/sonarqube-prometheus-exporter:{{ .Tag }}"
 
     # Skips the docker push. Could be useful if you also do draft releases.
     # If set to auto, the release will not be pushed to the docker repository
