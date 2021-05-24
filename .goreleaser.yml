@@ -56,3 +56,7 @@ dockers:
     # Path to the Dockerfile (from the project root).
     dockerfile: Dockerfile
     use_buildx: false
+    extra_files:
+      - Makefile
+      - go.mod
+      - go.sum
