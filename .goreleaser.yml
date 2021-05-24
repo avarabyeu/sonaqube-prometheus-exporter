@@ -1,9 +1,5 @@
 env:
   - GO111MODULE=on
-before:
-  hooks:
-    - make fmt
-    - make lint
 builds:
   - env:
       - CGO_ENABLED=0
