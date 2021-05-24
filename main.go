@@ -25,6 +25,7 @@ var (
 var (
 	gitRevision = "HEAD"
 	buildDate   = "unknown"
+	version     = "unknown"
 
 	versionCmd bool
 	helpCmd    bool
@@ -46,6 +47,7 @@ func init() {
 	flag.Parse()
 
 	if versionCmd {
+		fmt.Printf("Version: %s\n", version)
 		fmt.Printf("Git Revision: %s\n", gitRevision)
 		fmt.Printf("UTC Build Date: %s\n", buildDate)
 		os.Exit(0)

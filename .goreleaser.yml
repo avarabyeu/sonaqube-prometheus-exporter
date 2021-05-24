@@ -1,0 +1,66 @@
+env:
+  - GO111MODULE=on
+before:
+  hooks:
+    - make fmt
+    - make lint
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - 386
+      - amd64
+      - arm
+      - arm64
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.gitRevision={{.Commit}} -X main.buildDate={{ .CommitDate }}
+checksum:
+  name_template: '{{ .ProjectName }}_checksums.txt'
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - Merge pull request
+      - Merge branch
+      - go mod tidy
+# .goreleaser.yml
+dockers:
+  # You can have multiple Docker images.
+  -
+    # GOOS of the built binaries/packages that should be used.
+    goos: linux
+
+    # GOARCH of the built binaries/packages that should be used.
+    goarch: amd64
+
+    # GOARM of the built binaries/packages that should be used.
+    goarm: ''
+
+    # Templates of the Docker image names.
+    image_templates:
+      - "ghcr.io/avarabyeu/sonarqube-prometheus-exporter:latest"
+      - "ghcr.io/avarabyeu/sonarqube-prometheus-exporter:{{ .Tag }}"
+
+    # Skips the docker push. Could be useful if you also do draft releases.
+    # If set to auto, the release will not be pushed to the docker repository
+    # in case there is an indicator for prerelease in the tag e.g. v1.0.0-rc1
+    # Defaults to false.
+    skip_push: false
+
+    # Path to the Dockerfile (from the project root).
+    dockerfile: Dockerfile
+
+    # Whether to use `docker buildx build` instead of `docker build`.
+    # You probably want to set it to true when using flags like `--platform`.
+    # If true, will also add `--load` to the build flags.
+    # Defaults to false.
+    use_buildx: true
