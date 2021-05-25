@@ -1,5 +1,9 @@
 # Prometheus Exporter for Sonarqube
 
+![Build Status](https://github.com/fleetframework/sonarqube-prometheus-exporter/actions/workflows/build.yml/badge.svg)
+![Release](https://img.shields.io/github/v/release/fleetframework/sonarqube-prometheus-exporter)
+
+
 ## Usage
 
 ```
