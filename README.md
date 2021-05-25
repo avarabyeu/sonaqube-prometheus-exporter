@@ -29,5 +29,5 @@
 ## Run As Docker Container
 
 ```sh
-  docker run -p 8080:8080 ghcr.io/fleetframework/sonarqube-prometheus-exporter:v0.0.1 -port 8080 -url <sonar-url> -user <sonar-user> -password <sonar-password>
+  docker run -p 8080:8080 ghcr.io/fleetframework/sonarqube-prometheus-exporter:v0.0.2 -port 8080 -url <sonar-url> -user <sonar-user> -password <sonar-password>
 ```
