@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type SonarClient struct {
@@ -63,7 +64,7 @@ func (s *SonarClient) executeGet(u string, res interface{}) error {
 	}
 	rq.SetBasicAuth(s.user, s.password)
 
-	log.Printf("GET [%s]", rq.URL.String())
+	log.Debugf("GET [%s]", rq.URL.String())
 
 	rs, err := s.c.Do(rq)
 	if err != nil {
@@ -72,7 +73,7 @@ func (s *SonarClient) executeGet(u string, res interface{}) error {
 	defer func() {
 		if rs.Body != nil {
 			if err := rs.Body.Close(); err != nil {
-				log.Print(err)
+				log.Error(err)
 			}
 		}
 	}()

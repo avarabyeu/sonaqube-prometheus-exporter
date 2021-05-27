@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -19,6 +19,7 @@ var (
 type PrometheusExporter struct {
 	metrics map[string]*promMetric
 	mut     sync.Mutex
+	ns      string
 }
 
 type promMetric struct {
@@ -26,8 +27,9 @@ type promMetric struct {
 	metricType string
 }
 
-func NewPrometheusExporter() *PrometheusExporter {
+func NewPrometheusExporter(ns string) *PrometheusExporter {
 	return &PrometheusExporter{
+		ns:      ns,
 		metrics: map[string]*promMetric{},
 		mut:     sync.Mutex{},
 	}
@@ -45,7 +47,7 @@ func (pe *PrometheusExporter) Init(component *Component, metrics []*Metric) ([]s
 		}
 		pMetric := prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Namespace:   "sonar",
+				Namespace:   pe.ns,
 				Subsystem:   compName,
 				Name:        m.Key,
 				Help:        m.Description,
@@ -71,14 +73,14 @@ func (pe *PrometheusExporter) Run(measures *Measures) error {
 	for _, measure := range measures.Component.Measures {
 		pMetric, found := pe.metrics[measure.Metric]
 		if !found || pMetric == nil {
-			log.Printf("NO METRIC FOUND: %s", measure.Metric)
+			log.Debugf("NO METRIC FOUND: %s", measure.Metric)
 
 			continue
 		}
 
 		val, err := pe.getFloatValue(pMetric.metricType, measure)
 		if err != nil {
-			log.Printf("Unable to convert metric: %s[%s]", measure.Metric, measure.Value)
+			log.Debugf("Unable to convert metric: %s[%s]", measure.Metric, measure.Value)
 
 			continue
 		}
@@ -136,6 +138,6 @@ func getMetric(name string, metrics []*Metric) *Metric {
 			return m
 		}
 	}
-	log.Printf("NO METRIC FOUND: %s", name)
+	log.Debugf("NO METRIC FOUND: %s", name)
 	return nil
 }
