@@ -32,3 +32,7 @@ build-image: build
 
 run:
 	realize start
+
+tag:
+	git tag ${version}
+	git push origin ${version}
