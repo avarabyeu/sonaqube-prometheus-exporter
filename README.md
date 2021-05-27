@@ -5,6 +5,8 @@
 
 ## Usage
 
+### CLI arguments
+
 ```
 Usage of bin/sonarqube-prometheus-exporter:
   -help
@@ -29,6 +31,19 @@ Usage of bin/sonarqube-prometheus-exporter:
         Logging level, e.g. debug,info. Default: debug (default "info")
 
 ```
+
+### Environment Variables
+
+| Variable Name        | Default Value | Description                                                                                                       |
+|----------------------|---------------|-------------------------------------------------------------------------------------------------------------------|
+| SONAR_URL            |               | Sonarqube URL                                                                                                     |
+| SONAR_USER           |               | Sonarqube User                                                                                                    |
+| SONAR_PASSWORD       |               | Sonarqube Password                                                                                                |
+| PORT                 | 8080          | Exporter port                                                                                                     |
+| SONAR_SCRAPE_TIMEOUT | 1m            | Metrics scraper timeout                                                                                           |
+| LABEL_SEPARATOR      | #             | Label Separator. For instance, for Sonar with Label 'key#value', Prometheus attribute {project="my-project-name"} |
+| METRICS_NAMESPACE    | sonar         | Prometheus metrics namespace                                                                                      |
+| LOGGING_LEVEL        | info          | Logging level, e.g. debug,info                                                                                    |
 
 ## Run As Docker Container
 
