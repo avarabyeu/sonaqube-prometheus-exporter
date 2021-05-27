@@ -3,7 +3,6 @@
 ![Build Status](https://github.com/fleetframework/sonarqube-prometheus-exporter/actions/workflows/build.yml/badge.svg)
 ![Release](https://img.shields.io/github/v/release/fleetframework/sonarqube-prometheus-exporter)
 
-
 ## Usage
 
 ```
@@ -35,4 +34,10 @@ Usage of bin/sonarqube-prometheus-exporter:
 
 ```sh
   docker run -p 8080:8080 ghcr.io/fleetframework/sonarqube-prometheus-exporter:v0.0.2 -port 8080 -url <sonar-url> -user <sonar-user> -password <sonar-password>
+```
+
+or with environment variables
+
+```sh
+  docker run -p 8080:8080 -e PORT=8080 -e SONAR_URL=<sonar-url> -e SONAR_USER=<sonar-user> -e SONAR_PASSWORD=<sonar-password> ghcr.io/fleetframework/sonarqube-prometheus-exporter:v0.0.2
 ```

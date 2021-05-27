@@ -38,7 +38,7 @@ var (
 func init() {
 	var scrapeTimeoutStr string
 
-	flag.StringVar(&port, "port", "8080", "Exporter port")
+	flag.StringVar(&port, "port", getEnv("PORT", "8080"), "Exporter port. Default 8080")
 	flag.StringVar(&scrapeTimeoutStr, "scrape-timeout", getEnv("SONAR_SCRAPE_TIMEOUT", "1m"), "Metrics scraper timeout. Default: 1m")
 	flag.StringVar(&sonarURL, "url", getEnv("SONAR_URL", ""), "Required. Sonarqube URL")
 	flag.StringVar(&sonarUser, "user", getEnv("SONAR_USER", ""), "Required. Sonarqube User")
