@@ -7,22 +7,27 @@
 ## Usage
 
 ```
+Usage of bin/sonarqube-prometheus-exporter:
   -help
         Show help
-  -label-separator string
-        Label Separator. For instance, for Sonar with Label 'key#value', Prometheus attribute {project="my-project-name"} (default "#")
-  -password string
-        Sonarqube Password
-  -port int
-        Exporter port (default 8080)
-  -scrape-timeout duration
-        Metrics scraper timeout (default 1m0s)
-  -url string
-        Sonarqube URL
-  -user string
-        Sonarqube User
   -version
         Show version
+  -metrics-ns string
+        Prometheus metrics namespace. Default: sonar (default "sonarxxx")
+  -url string
+        Required. Sonarqube URL
+  -user string
+        Required. Sonarqube User
+  -password string
+        Required. Sonarqube Password
+  -port string
+        Exporter port (default "8080")
+  -scrape-timeout string
+        Metrics scraper timeout. Default: 1m (default "1m")
+  -label-separator string
+        Label Separator. For instance, for Sonar with Label 'key#value', Prometheus attribute {project="my-project-name"} (default "#")
+  -log string
+        Logging level, e.g. debug,info. Default: debug (default "info")
 
 ```
 
