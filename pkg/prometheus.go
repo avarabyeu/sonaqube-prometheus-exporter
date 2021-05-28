@@ -40,6 +40,11 @@ func NewPrometheusExporter(ns string, staticLabels map[string]string, labels []s
 		staticLabels: staticLabels,
 	}
 
+	// make sure names are escaped
+	for i, label := range labels {
+		labels[i] = escapeName(label)
+	}
+
 	// adds default component name label
 	labels = append(labels, componentNameLabel)
 	sort.Strings(labels)
@@ -162,4 +167,9 @@ func (pe *PrometheusExporter) getFloatValue(mType string, measure *Measure) (fVa
 		fVar, err = strconv.ParseFloat(strVal, 64)
 	}
 	return
+}
+
+// escapeName escapes unsupported symbols
+func escapeName(n string) string {
+	return promNamePattern.ReplaceAllString(n, "_")
 }

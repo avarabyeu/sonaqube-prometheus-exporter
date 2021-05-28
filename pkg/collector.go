@@ -16,9 +16,6 @@ type Collector struct {
 }
 
 func NewCollector(sonar *SonarClient, tagSeparator, namespace string, staticLabels map[string]string, labels []string) *Collector {
-	for idx, l := range labels {
-		labels[idx] = escapeName(l)
-	}
 	return &Collector{sonar: sonar, tagSeparator: tagSeparator, exporter: NewPrometheusExporter(namespace, staticLabels, labels)}
 }
 
@@ -109,9 +106,4 @@ func (c *Collector) tagsToLabels(tags []string) map[string]string {
 		}
 	}
 	return labels
-}
-
-// escapeName escapes unsupported symbols
-func escapeName(n string) string {
-	return promNamePattern.ReplaceAllString(n, "_")
 }
