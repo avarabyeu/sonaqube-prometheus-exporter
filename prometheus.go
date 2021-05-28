@@ -18,11 +18,13 @@ var (
 	componentNameLabel     = "component"
 )
 
+// PrometheusExporter is response for converting Sonarqube metrics to Prometheus format and reporting them
 type PrometheusExporter struct {
-	metrics map[string]*promMetric
-	mut     sync.RWMutex
-	ns      string
-	labels  []string
+	metrics      map[string]*promMetric
+	mut          sync.RWMutex
+	ns           string
+	labels       []string
+	staticLabels map[string]string
 }
 
 type promMetric struct {
@@ -30,11 +32,13 @@ type promMetric struct {
 	metricType string
 }
 
-func NewPrometheusExporter(ns string, labels []string) *PrometheusExporter {
+// NewPrometheusExporter creates new exporter instance
+func NewPrometheusExporter(ns string, staticLabels map[string]string, labels []string) *PrometheusExporter {
 	p := &PrometheusExporter{
-		ns:      ns,
-		metrics: map[string]*promMetric{},
-		mut:     sync.RWMutex{},
+		ns:           ns,
+		metrics:      map[string]*promMetric{},
+		mut:          sync.RWMutex{},
+		staticLabels: staticLabels,
 	}
 
 	// make sure label names are OK
@@ -50,10 +54,9 @@ func NewPrometheusExporter(ns string, labels []string) *PrometheusExporter {
 }
 
 func (pe *PrometheusExporter) InitMetrics(
-	staticLabels map[string]string,
 	metrics []*Metric,
 ) ([]string, error) {
-	return pe.registerMetrics(pe.labels, staticLabels, metrics)
+	return pe.registerMetrics(metrics)
 }
 
 func (pe *PrometheusExporter) Report(component *Component, measures *Measures) {
@@ -89,7 +92,7 @@ func (pe *PrometheusExporter) Report(component *Component, measures *Measures) {
 	}
 }
 
-func (pe *PrometheusExporter) registerMetrics(labelNames []string, labels map[string]string, metrics []*Metric) ([]string, error) {
+func (pe *PrometheusExporter) registerMetrics(metrics []*Metric) ([]string, error) {
 	pe.mut.RLock()
 	defer pe.mut.RUnlock()
 
@@ -108,8 +111,8 @@ func (pe *PrometheusExporter) registerMetrics(labelNames []string, labels map[st
 				Namespace:   pe.ns,
 				Name:        m.Key,
 				Help:        m.Description,
-				ConstLabels: labels,
-			}, labelNames)
+				ConstLabels: pe.staticLabels,
+			}, pe.labels)
 		if err := prometheus.Register(pMetric); err != nil {
 			return nil, fmt.Errorf("unable to register metric: %w", err)
 		}

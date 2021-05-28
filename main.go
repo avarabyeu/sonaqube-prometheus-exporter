@@ -153,72 +153,8 @@ func main() {
 
 func initScheduler(done <-chan struct{}) error {
 	sonar := NewSonarClient(sonarURL, sonarUser, sonarPassword)
-
-	allMetrics, err := sonar.GetMetrics()
-	if err != nil {
-		return fmt.Errorf("unable to get sonar metrics: %w", err)
-	}
-
-	exp := NewPrometheusExporter(metricsNamespace, tagKeys)
-	// registers metrics to be gathered
-	metricNames, err := exp.InitMetrics(labels, allMetrics)
-	if err != nil {
-		return fmt.Errorf("unable to init metrics exporter: %w", err)
-	}
-	log.Debugf("Metrics to be collected\n: %s", strings.Join(metricNames, ","))
-	if len(metricNames) == 0 {
-		return fmt.Errorf("no metrics to gather detected")
-	}
-
-	go schedule(done, 0, scrapeTimeout, func() error {
-		// all components which are projects
-		components, err := sonar.SearchComponents()
-		if err != nil {
-			return fmt.Errorf("unable to get all sonar components: %w", err)
-		}
-
-		// iterate over all components
-		for _, cInfo := range components {
-			log.Debugf("Updating metrics for project: %s", cInfo.Key)
-
-			// get component. Selected on each iteration since
-			// list of tags can be changed
-			component, cErr := sonar.GetComponent(cInfo.Key)
-			if cErr != nil {
-				return fmt.Errorf("unable to find component [%s]: %w", cInfo.Key, cErr)
-			}
-
-			// get component measures to be transformed to prometheus metrics
-			measures, mErr := sonar.GetMeasures(component.Key, metricNames)
-			if mErr != nil {
-				return fmt.Errorf("unable to get sonar measures: %w", mErr)
-			}
-
-			exp.Report(component, measures)
-		}
-		return nil
-	})
-	return nil
-}
-
-// schedule executes action with defined timeout until receives timeout signal
-func schedule(done <-chan struct{}, initialDelay, timeout time.Duration, callback func() error) {
-	var err error
-
-	attemptTimer := time.After(initialDelay)
-	for {
-		select {
-		case <-done:
-			return
-		case <-attemptTimer:
-			err = callback()
-			if err != nil {
-				log.Printf("Scheduler error: %v\n", err)
-			}
-			attemptTimer = time.After(timeout)
-			log.Println("Scheduler job run successfully")
-		}
-	}
+	exporter := NewPrometheusExporter(metricsNamespace, labels, tagKeys)
+	return NewCollector(sonar, exporter).Schedule(done, 0, scrapeTimeout)
 }
 
 func getEnv(name, def string) string {
