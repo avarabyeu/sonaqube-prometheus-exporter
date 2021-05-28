@@ -45,7 +45,7 @@ func init() {
 	flag.StringVar(&sonarPassword, "password", getEnv("SONAR_PASSWORD", ""), "Required. Sonarqube Password")
 	flag.StringVar(&labelSeparator, "label-separator", getEnv("LABEL_SEPARATOR", "#"), "Label Separator. For instance, "+
 		"for Sonar with Label 'key#value', Prometheus attribute {project=\"my-project-name\"}")
-	flag.StringVar(&metricsNamespace, "metrics-ns", getEnv("METRICS_NAMESPACE", "sonarxxx"), "Prometheus metrics namespace. Default: sonar")
+	flag.StringVar(&metricsNamespace, "metrics-ns", getEnv("METRICS_NAMESPACE", "sonar"), "Prometheus metrics namespace. Default: sonar")
 	flag.StringVar(&loggingLevel, "log", getEnv("LOGGING_LEVEL", "info"), "Logging level, e.g. debug,info. Default: debug")
 
 	flag.BoolVar(&versionCmd, "version", false, "Show version")

@@ -14,7 +14,7 @@ Usage of bin/sonarqube-prometheus-exporter:
   -version
         Show version
   -metrics-ns string
-        Prometheus metrics namespace. Default: sonar (default "sonarxxx")
+        Prometheus metrics namespace. Default: sonar (default "sonar")
   -url string
         Required. Sonarqube URL
   -user string
