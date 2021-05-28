@@ -13,6 +13,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/fleetframework/sonarqube-prometheus-exporter/pkg"
 )
 
 var (
@@ -136,7 +138,10 @@ func main() {
 		}
 	}()
 	go func() {
-		if err := initScheduler(done); err != nil {
+		sonar := pkg.NewSonarClient(sonarURL, sonarUser, sonarPassword)
+		err := pkg.NewCollector(sonar, tagSeparator, metricsNamespace, labels, tagKeys).
+			Schedule(done, 0, scrapeTimeout)
+		if err != nil {
 			log.Fatalf("Unable to init metrics: %v", err)
 		}
 	}()
@@ -149,12 +154,6 @@ func main() {
 	if err := server.Shutdown(ctx); err != nil {
 		log.Error(err)
 	}
-}
-
-func initScheduler(done <-chan struct{}) error {
-	sonar := NewSonarClient(sonarURL, sonarUser, sonarPassword)
-	exporter := NewPrometheusExporter(metricsNamespace, labels, tagKeys)
-	return NewCollector(sonar, exporter).Schedule(done, 0, scrapeTimeout)
 }
 
 func getEnv(name, def string) string {

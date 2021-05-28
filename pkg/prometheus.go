@@ -1,11 +1,10 @@
-package main
+package pkg
 
 import (
 	"fmt"
 	"regexp"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -41,10 +40,6 @@ func NewPrometheusExporter(ns string, staticLabels map[string]string, labels []s
 		staticLabels: staticLabels,
 	}
 
-	// make sure label names are OK
-	for idx, l := range labels {
-		labels[idx] = p.escapeName(l)
-	}
 	// adds default component name label
 	labels = append(labels, componentNameLabel)
 	sort.Strings(labels)
@@ -59,17 +54,16 @@ func (pe *PrometheusExporter) InitMetrics(
 	return pe.registerMetrics(metrics)
 }
 
-func (pe *PrometheusExporter) Report(component *Component, measures *Measures) {
+func (pe *PrometheusExporter) Report(component string, labels map[string]string, measures *Measures) {
 	pe.mut.Lock()
 	defer pe.mut.Unlock()
 
-	labels := pe.tagsToLabels(component.Tags)
 	// adds default component name label
-	labels[componentNameLabel] = component.Key
+	labels[componentNameLabel] = component
 	pe.filterSupported(labels)
 
 	if len(labels) != len(pe.labels) {
-		log.Debugf("Ignoreing component %s due to incorrect list of labels: [%s] != [%s]", component.Key, labels, pe.labels)
+		log.Debugf("Ignoreing component %s due to incorrect list of labels: [%s] != [%s]", component, labels, pe.labels)
 		return
 	}
 
@@ -125,35 +119,6 @@ func (pe *PrometheusExporter) registerMetrics(metrics []*Metric) ([]string, erro
 	return mNames, nil
 }
 
-// tagsToLabels converts Sonar's project tags to Prometheus's labels
-// tags are supposed to be separated with separator, e.g. key#value
-func (pe *PrometheusExporter) tagsToLabels(tags []string) map[string]string {
-	labels := map[string]string{}
-	if tagSeparator != "" {
-		for _, tag := range tags {
-			parts := strings.SplitN(tag, tagSeparator, 2)
-			if len(parts) == 2 {
-				labels[pe.escapeName(parts[0])] = parts[1]
-			}
-		}
-	}
-	return labels
-}
-
-// tagsToLabels converts Sonar's project tags to Prometheus's labels
-func (pe *PrometheusExporter) tagsToLabelNames(tags []string) []string {
-	var labels []string
-	if tagSeparator != "" {
-		for _, tag := range tags {
-			parts := strings.Split(tag, tagSeparator)
-			if len(parts) == 2 {
-				labels = append(labels, pe.escapeName(parts[0]))
-			}
-		}
-	}
-	return labels
-}
-
 func (pe *PrometheusExporter) supportsMetric(m *Metric) bool {
 	_, unsupported := unsupportedMetricTypes[m.Type]
 	return !unsupported
@@ -173,11 +138,6 @@ func (pe *PrometheusExporter) filterSupported(labels map[string]string) {
 func (pe *PrometheusExporter) supportsLabel(l string) bool {
 	idx := sort.SearchStrings(pe.labels, l)
 	return idx < len(pe.labels) && pe.labels[idx] == l
-}
-
-// escapeName escapes unsupported symbols
-func (pe *PrometheusExporter) escapeName(n string) string {
-	return promNamePattern.ReplaceAllString(n, "_")
 }
 
 // getFloatValue gets value from measure converting it to float64 as prometheus requires

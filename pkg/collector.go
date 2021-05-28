@@ -1,4 +1,4 @@
-package main
+package pkg
 
 import (
 	"fmt"
@@ -10,12 +10,16 @@ import (
 
 // Collector schedules measures collection and executes exporter in order to get them converted to prometheus format
 type Collector struct {
-	sonar    *SonarClient
-	exporter *PrometheusExporter
+	sonar        *SonarClient
+	exporter     *PrometheusExporter
+	tagSeparator string
 }
 
-func NewCollector(sonar *SonarClient, exporter *PrometheusExporter) *Collector {
-	return &Collector{sonar: sonar, exporter: exporter}
+func NewCollector(sonar *SonarClient, tagSeparator, namespace string, staticLabels map[string]string, labels []string) *Collector {
+	for idx, l := range labels {
+		labels[idx] = escapeName(l)
+	}
+	return &Collector{sonar: sonar, tagSeparator: tagSeparator, exporter: NewPrometheusExporter(namespace, staticLabels, labels)}
 }
 
 func (c *Collector) Schedule(done <-chan struct{}, initialDelay, timeout time.Duration) error {
@@ -67,7 +71,8 @@ func (c *Collector) reportComponent(metricNames []string) func(componentKey stri
 			log.Errorf("unable to get sonar measures: %v", mErr)
 		}
 
-		c.exporter.Report(component, measures)
+		labels := c.tagsToLabels(component.Tags)
+		c.exporter.Report(component.Key, labels, measures)
 	}
 }
 
@@ -89,4 +94,24 @@ func (c *Collector) schedule(done <-chan struct{}, initialDelay, timeout time.Du
 			log.Println("Scheduler job run successfully")
 		}
 	}
+}
+
+// tagsToLabels converts Sonar's project tags to Prometheus's labels
+// tags are supposed to be separated with separator, e.g. key#value
+func (c *Collector) tagsToLabels(tags []string) map[string]string {
+	labels := map[string]string{}
+	if c.tagSeparator != "" {
+		for _, tag := range tags {
+			parts := strings.SplitN(tag, c.tagSeparator, 2)
+			if len(parts) == 2 {
+				labels[escapeName(parts[0])] = parts[1]
+			}
+		}
+	}
+	return labels
+}
+
+// escapeName escapes unsupported symbols
+func escapeName(n string) string {
+	return promNamePattern.ReplaceAllString(n, "_")
 }
