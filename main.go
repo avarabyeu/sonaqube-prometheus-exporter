@@ -52,12 +52,13 @@ func init() {
 	flag.StringVar(&sonarUser, "user", getEnv("SONAR_USER", ""), "Required. Sonarqube User")
 	flag.StringVar(&sonarPassword, "password", getEnv("SONAR_PASSWORD", ""), "Required. Sonarqube Password")
 	flag.StringVar(&metricsNamespace, "metrics-ns", getEnv("METRICS_NAMESPACE", "sonar"), "Prometheus metrics namespace. Default: sonar")
-	flag.StringVar(&loggingLevel, "log", getEnv("LOGGING_LEVEL", "debug"), "Logging level, e.g. debug,info. Default: debug")
 
 	flag.StringVar(&labelsStr, "labels", getEnv("LABELS", ""), "Static labels to be added to all metrics. In form 'label1=labelvalue,label2=labelValue'")
 	flag.StringVar(&tagKeysStr, "tag-keys", getEnv("TAG_KEYS", ""), "List of tag keys to be used as metric labels")
 	flag.StringVar(&tagSeparator, "tag-separator", getEnv("TAG_SEPARATOR", "#"), "Tag Separator. For instance, "+
 		"for Sonar project with tag 'key#value', Prometheus will have label {project=\"my-project-name\"} if defined in TAG_KEYS list")
+
+	flag.StringVar(&loggingLevel, "log", getEnv("LOGGING_LEVEL", "info"), "Logging level, e.g. debug,info. Default: debug")
 
 	flag.BoolVar(&versionCmd, "version", false, "Show version")
 	flag.BoolVar(&helpCmd, "help", false, "Show help")
@@ -158,27 +159,27 @@ func initScheduler(done <-chan struct{}) error {
 		return fmt.Errorf("unable to get sonar metrics: %w", err)
 	}
 
-	// all components which are projects
-	components, err := sonar.SearchComponents()
-	if err != nil {
-		return fmt.Errorf("unable to get all sonar components: %w", err)
-	}
-
 	exp := NewPrometheusExporter(metricsNamespace, tagKeys)
-
 	// registers metrics to be gathered
 	metricNames, err := exp.InitMetrics(labels, allMetrics)
 	if err != nil {
 		return fmt.Errorf("unable to init metrics exporter: %w", err)
 	}
-	log.Debugf("Gathering metrics\n: %s", strings.Join(metricNames, ","))
+	log.Debugf("Metrics to be collected\n: %s", strings.Join(metricNames, ","))
 	if len(metricNames) == 0 {
 		return fmt.Errorf("no metrics to gather detected")
 	}
 
 	go schedule(done, 0, scrapeTimeout, func() error {
+		// all components which are projects
+		components, err := sonar.SearchComponents()
+		if err != nil {
+			return fmt.Errorf("unable to get all sonar components: %w", err)
+		}
+
 		// iterate over all components
 		for _, cInfo := range components {
+			log.Debugf("Updating metrics for project: %s", cInfo.Key)
 
 			// get component. Selected on each iteration since
 			// list of tags can be changed
@@ -186,7 +187,6 @@ func initScheduler(done <-chan struct{}) error {
 			if cErr != nil {
 				return fmt.Errorf("unable to find component [%s]: %w", cInfo.Key, cErr)
 			}
-			log.Infof("Registring project: %s", cInfo.Key)
 
 			// get component measures to be transformed to prometheus metrics
 			measures, mErr := sonar.GetMeasures(component.Key, metricNames)

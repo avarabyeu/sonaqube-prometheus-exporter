@@ -61,6 +61,7 @@ func (pe *PrometheusExporter) Report(component *Component, measures *Measures) {
 	defer pe.mut.Unlock()
 
 	labels := pe.tagsToLabels(component.Tags)
+	// adds default component name label
 	labels[componentNameLabel] = component.Key
 	pe.filterSupported(labels)
 
@@ -72,7 +73,7 @@ func (pe *PrometheusExporter) Report(component *Component, measures *Measures) {
 	for _, measure := range measures.Component.Measures {
 		pMetric, found := pe.metrics[measure.Metric]
 		if !found || pMetric == nil {
-			log.Debugf("NO METRIC FOUND: %s", measure.Metric)
+			log.Debugf("Metric isn't found: %s", measure.Metric)
 
 			continue
 		}
@@ -84,7 +85,7 @@ func (pe *PrometheusExporter) Report(component *Component, measures *Measures) {
 			continue
 		}
 
-		(*pMetric.metric).With(labels).Add(val)
+		(*pMetric.metric).With(labels).Set(val)
 	}
 }
 
