@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -21,8 +22,13 @@ var (
 	sonarUser        string
 	sonarPassword    string
 	metricsNamespace string
-	labelSeparator   string
-	loggingLevel     string
+
+	labels map[string]string
+
+	tagKeys      []string
+	tagSeparator string
+
+	loggingLevel string
 )
 
 var (
@@ -37,16 +43,21 @@ var (
 // nolint:gochecknoinits
 func init() {
 	var scrapeTimeoutStr string
+	var labelsStr string
+	var tagKeysStr string
 
 	flag.StringVar(&port, "port", getEnv("PORT", "8080"), "Exporter port. Default 8080")
 	flag.StringVar(&scrapeTimeoutStr, "scrape-timeout", getEnv("SONAR_SCRAPE_TIMEOUT", "1m"), "Metrics scraper timeout. Default: 1m")
 	flag.StringVar(&sonarURL, "url", getEnv("SONAR_URL", ""), "Required. Sonarqube URL")
 	flag.StringVar(&sonarUser, "user", getEnv("SONAR_USER", ""), "Required. Sonarqube User")
 	flag.StringVar(&sonarPassword, "password", getEnv("SONAR_PASSWORD", ""), "Required. Sonarqube Password")
-	flag.StringVar(&labelSeparator, "label-separator", getEnv("LABEL_SEPARATOR", "#"), "Label Separator. For instance, "+
-		"for Sonar with Label 'key#value', Prometheus attribute {project=\"my-project-name\"}")
 	flag.StringVar(&metricsNamespace, "metrics-ns", getEnv("METRICS_NAMESPACE", "sonar"), "Prometheus metrics namespace. Default: sonar")
-	flag.StringVar(&loggingLevel, "log", getEnv("LOGGING_LEVEL", "info"), "Logging level, e.g. debug,info. Default: debug")
+	flag.StringVar(&loggingLevel, "log", getEnv("LOGGING_LEVEL", "debug"), "Logging level, e.g. debug,info. Default: debug")
+
+	flag.StringVar(&labelsStr, "labels", getEnv("LABELS", ""), "Static labels to be added to all metrics. In form 'label1=labelvalue,label2=labelValue'")
+	flag.StringVar(&tagKeysStr, "tag-keys", getEnv("TAG_KEYS", ""), "List of tag keys to be used as metric labels")
+	flag.StringVar(&tagSeparator, "tag-separator", getEnv("TAG_SEPARATOR", "#"), "Tag Separator. For instance, "+
+		"for Sonar project with tag 'key#value', Prometheus will have label {project=\"my-project-name\"} if defined in TAG_KEYS list")
 
 	flag.BoolVar(&versionCmd, "version", false, "Show version")
 	flag.BoolVar(&helpCmd, "help", false, "Show help")
@@ -76,9 +87,21 @@ func init() {
 		flag.Usage()
 		log.Fatal("make sure all required flags are provided")
 	}
-	if _, err := strconv.ParseUint(port, 10, 32); err != nil {
+	if _, err = strconv.ParseUint(port, 10, 32); err != nil {
 		flag.Usage()
 		log.Fatalf("incorrect port provided: %s", port)
+	}
+
+	// parses tag keys
+	if tagKeysStr != "" {
+		tagKeys = strings.Split(tagKeysStr, ",")
+	}
+
+	// parses static prometheus metrics
+	labels, err = parseMap(labelsStr)
+	if err != nil {
+		flag.Usage()
+		log.Fatalf(err.Error())
 	}
 }
 
@@ -112,7 +135,7 @@ func main() {
 		}
 	}()
 	go func() {
-		if err := initMetrics(done); err != nil {
+		if err := initScheduler(done); err != nil {
 			log.Fatalf("Unable to init metrics: %v", err)
 		}
 	}()
@@ -127,39 +150,54 @@ func main() {
 	}
 }
 
-func initMetrics(done <-chan struct{}) error {
+func initScheduler(done <-chan struct{}) error {
 	sonar := NewSonarClient(sonarURL, sonarUser, sonarPassword)
-	components, err := sonar.GetComponents()
+
+	allMetrics, err := sonar.GetMetrics()
 	if err != nil {
-		return fmt.Errorf("unable to get sonar components: %w", err)
+		return fmt.Errorf("unable to get sonar metrics: %w", err)
 	}
 
-	for _, cInfo := range components {
-		componentKey := cInfo.Key
-		component, err := sonar.GetComponent(componentKey)
-		if err != nil {
-			return err
-		}
-		allMetrics, err := sonar.GetMetrics()
-		if err != nil {
-			return fmt.Errorf("unable to get sonar metrics: %w", err)
-		}
+	// all components which are projects
+	components, err := sonar.SearchComponents()
+	if err != nil {
+		return fmt.Errorf("unable to get all sonar components: %w", err)
+	}
 
-		exp := NewPrometheusExporter(metricsNamespace)
-		metrics, err := exp.Init(component, allMetrics)
-		if err != nil {
-			return fmt.Errorf("unable to init metrics exporter: %w", err)
-		}
+	exp := NewPrometheusExporter(metricsNamespace, tagKeys)
 
-		schedule(done, 0, scrapeTimeout, func() error {
-			measures, err := sonar.GetMeasures(componentKey, metrics)
-			if err != nil {
-				return fmt.Errorf("unable to get sonar measures: %w", err)
+	// registers metrics to be gathered
+	metricNames, err := exp.InitMetrics(labels, allMetrics)
+	if err != nil {
+		return fmt.Errorf("unable to init metrics exporter: %w", err)
+	}
+	log.Debugf("Gathering metrics\n: %s", strings.Join(metricNames, ","))
+	if len(metricNames) == 0 {
+		return fmt.Errorf("no metrics to gather detected")
+	}
+
+	go schedule(done, 0, scrapeTimeout, func() error {
+		// iterate over all components
+		for _, cInfo := range components {
+
+			// get component. Selected on each iteration since
+			// list of tags can be changed
+			component, cErr := sonar.GetComponent(cInfo.Key)
+			if cErr != nil {
+				return fmt.Errorf("unable to find component [%s]: %w", cInfo.Key, cErr)
+			}
+			log.Infof("Registring project: %s", cInfo.Key)
+
+			// get component measures to be transformed to prometheus metrics
+			measures, mErr := sonar.GetMeasures(component.Key, metricNames)
+			if mErr != nil {
+				return fmt.Errorf("unable to get sonar measures: %w", mErr)
 			}
 
-			return exp.Run(measures)
-		})
-	}
+			exp.Report(component, measures)
+		}
+		return nil
+	})
 	return nil
 }
 
@@ -189,4 +227,21 @@ func getEnv(name, def string) string {
 		envVar = def
 	}
 	return envVar
+}
+
+func parseMap(str string) (map[string]string, error) {
+	m := map[string]string{}
+	if str == "" {
+		return m, nil
+	}
+	entries := strings.Split(str, ",")
+
+	for _, entry := range entries {
+		kv := strings.SplitN(entry, "=", 2)
+		if len(kv) < 2 {
+			return nil, fmt.Errorf("incorrect format: %s", str)
+		}
+		m[kv[0]] = kv[1]
+	}
+	return m, nil
 }

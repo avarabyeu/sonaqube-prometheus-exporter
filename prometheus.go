@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,63 +13,61 @@ import (
 )
 
 var (
-	unsupportedTypes = map[string]struct{}{"DATA": {}}
-	promNamePattern  = regexp.MustCompile("[^a-zA-Z_:]")
+	unsupportedMetricTypes = map[string]struct{}{"DATA": {}}
+	promNamePattern        = regexp.MustCompile("[^a-zA-Z_:]")
+	componentNameLabel     = "component"
 )
 
 type PrometheusExporter struct {
 	metrics map[string]*promMetric
-	mut     sync.Mutex
+	mut     sync.RWMutex
 	ns      string
+	labels  []string
 }
 
 type promMetric struct {
-	metric     *prometheus.Gauge
+	metric     *prometheus.GaugeVec
 	metricType string
 }
 
-func NewPrometheusExporter(ns string) *PrometheusExporter {
-	return &PrometheusExporter{
+func NewPrometheusExporter(ns string, labels []string) *PrometheusExporter {
+	p := &PrometheusExporter{
 		ns:      ns,
 		metrics: map[string]*promMetric{},
-		mut:     sync.Mutex{},
-	}
-}
-
-func (pe *PrometheusExporter) Init(component *Component, metrics []*Metric) ([]string, error) {
-	// metric names
-	var mNames []string
-
-	compName := pe.cleanupName(component.Key)
-	labels := pe.tagsToLabels(component.Tags)
-	for _, m := range metrics {
-		if _, unsupported := unsupportedTypes[m.Type]; unsupported {
-			continue
-		}
-		pMetric := prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Namespace:   pe.ns,
-				Subsystem:   compName,
-				Name:        m.Key,
-				Help:        m.Description,
-				ConstLabels: labels,
-			})
-		if err := prometheus.Register(pMetric); err != nil {
-			return nil, fmt.Errorf("unable to register metric: %w", err)
-		}
-		pe.metrics[m.Key] = &promMetric{
-			metric:     &pMetric,
-			metricType: m.Type,
-		}
-		mNames = append(mNames, m.Key)
+		mut:     sync.RWMutex{},
 	}
 
-	return mNames, nil
+	// make sure label names are OK
+	for idx, l := range labels {
+		labels[idx] = p.escapeName(l)
+	}
+	// adds default component name label
+	labels = append(labels, componentNameLabel)
+	sort.Strings(labels)
+	p.labels = labels
+
+	return p
 }
 
-func (pe *PrometheusExporter) Run(measures *Measures) error {
+func (pe *PrometheusExporter) InitMetrics(
+	staticLabels map[string]string,
+	metrics []*Metric,
+) ([]string, error) {
+	return pe.registerMetrics(pe.labels, staticLabels, metrics)
+}
+
+func (pe *PrometheusExporter) Report(component *Component, measures *Measures) {
 	pe.mut.Lock()
 	defer pe.mut.Unlock()
+
+	labels := pe.tagsToLabels(component.Tags)
+	labels[componentNameLabel] = component.Key
+	pe.filterSupported(labels)
+
+	if len(labels) != len(pe.labels) {
+		log.Debugf("Ignoreing component %s due to incorrect list of labels: [%s] != [%s]", component.Key, labels, pe.labels)
+		return
+	}
 
 	for _, measure := range measures.Component.Measures {
 		pMetric, found := pe.metrics[measure.Metric]
@@ -84,11 +83,100 @@ func (pe *PrometheusExporter) Run(measures *Measures) error {
 
 			continue
 		}
-		(*pMetric.metric).Add(val)
+
+		(*pMetric.metric).With(labels).Add(val)
 	}
-	return nil
 }
 
+func (pe *PrometheusExporter) registerMetrics(labelNames []string, labels map[string]string, metrics []*Metric) ([]string, error) {
+	pe.mut.RLock()
+	defer pe.mut.RUnlock()
+
+	var mNames []string
+	for _, m := range metrics {
+		if _, ok := pe.metrics[m.Key]; ok {
+			// metric has already been registered
+			continue
+		}
+		if !pe.supportsMetric(m) {
+			// the metric is not supported
+			continue
+		}
+		pMetric := prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace:   pe.ns,
+				Name:        m.Key,
+				Help:        m.Description,
+				ConstLabels: labels,
+			}, labelNames)
+		if err := prometheus.Register(pMetric); err != nil {
+			return nil, fmt.Errorf("unable to register metric: %w", err)
+		}
+		pe.metrics[m.Key] = &promMetric{
+			metric:     pMetric,
+			metricType: m.Type,
+		}
+		mNames = append(mNames, m.Key)
+	}
+	return mNames, nil
+}
+
+// tagsToLabels converts Sonar's project tags to Prometheus's labels
+// tags are supposed to be separated with separator, e.g. key#value
+func (pe *PrometheusExporter) tagsToLabels(tags []string) map[string]string {
+	labels := map[string]string{}
+	if tagSeparator != "" {
+		for _, tag := range tags {
+			parts := strings.SplitN(tag, tagSeparator, 2)
+			if len(parts) == 2 {
+				labels[pe.escapeName(parts[0])] = parts[1]
+			}
+		}
+	}
+	return labels
+}
+
+// tagsToLabels converts Sonar's project tags to Prometheus's labels
+func (pe *PrometheusExporter) tagsToLabelNames(tags []string) []string {
+	var labels []string
+	if tagSeparator != "" {
+		for _, tag := range tags {
+			parts := strings.Split(tag, tagSeparator)
+			if len(parts) == 2 {
+				labels = append(labels, pe.escapeName(parts[0]))
+			}
+		}
+	}
+	return labels
+}
+
+func (pe *PrometheusExporter) supportsMetric(m *Metric) bool {
+	_, unsupported := unsupportedMetricTypes[m.Type]
+	return !unsupported
+}
+
+// filterSupported removes unsupported labels
+func (pe *PrometheusExporter) filterSupported(labels map[string]string) {
+	for k := range labels {
+		if !pe.supportsLabel(k) {
+			delete(labels, k)
+		}
+	}
+}
+
+// supportsLabel checks whether label is supported
+// not list of labels MUST be ordered
+func (pe *PrometheusExporter) supportsLabel(l string) bool {
+	idx := sort.SearchStrings(pe.labels, l)
+	return idx < len(pe.labels) && pe.labels[idx] == l
+}
+
+// escapeName escapes unsupported symbols
+func (pe *PrometheusExporter) escapeName(n string) string {
+	return promNamePattern.ReplaceAllString(n, "_")
+}
+
+// getFloatValue gets value from measure converting it to float64 as prometheus requires
 func (pe *PrometheusExporter) getFloatValue(mType string, measure *Measure) (fVar float64, err error) {
 	var strVal string
 	if measure.Value != "" {
@@ -110,34 +198,4 @@ func (pe *PrometheusExporter) getFloatValue(mType string, measure *Measure) (fVa
 		fVar, err = strconv.ParseFloat(strVal, 64)
 	}
 	return
-}
-
-func (pe *PrometheusExporter) cleanupName(n string) string {
-	return promNamePattern.ReplaceAllString(n, "_")
-}
-
-// tagsToLabels converts Sonar's project tags to Prometheus's labels
-// tags are supposed to be separated with separator, e.g. key#value
-func (pe *PrometheusExporter) tagsToLabels(tags []string) map[string]string {
-	labels := map[string]string{}
-	if labelSeparator != "" {
-		for _, tag := range tags {
-			parts := strings.Split(tag, labelSeparator)
-			if len(parts) == 2 {
-				labels[pe.cleanupName(parts[0])] = parts[1]
-			}
-		}
-	}
-	return labels
-}
-
-// nolint:deadcode
-func getMetric(name string, metrics []*Metric) *Metric {
-	for _, m := range metrics {
-		if m.Name == name {
-			return m
-		}
-	}
-	log.Debugf("NO METRIC FOUND: %s", name)
-	return nil
 }

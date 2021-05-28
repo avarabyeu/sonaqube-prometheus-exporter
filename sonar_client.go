@@ -22,7 +22,7 @@ func NewSonarClient(url, user, password string) *SonarClient {
 	return &SonarClient{url: strings.TrimRight(url, "/"), user: user, password: password, c: http.DefaultClient}
 }
 
-func (s *SonarClient) GetComponents() ([]*ComponentInfo, error) {
+func (s *SonarClient) SearchComponents() ([]*ComponentInfo, error) {
 	var c Components
 	err := s.executeGet(fmt.Sprintf("%s/api/components/search?qualifiers=TRK", s.url), &c)
 	if err != nil {
@@ -30,6 +30,22 @@ func (s *SonarClient) GetComponents() ([]*ComponentInfo, error) {
 	}
 
 	return c.Components, err
+}
+
+func (s *SonarClient) GetComponents() ([]*Component, error) {
+	componentKeys, err := s.SearchComponents()
+	if err != nil {
+		return nil, err
+	}
+	components := make([]*Component, len(componentKeys))
+	for i, comp := range componentKeys {
+		component, err := s.GetComponent(comp.Key)
+		if err != nil {
+			return nil, err
+		}
+		components[i] = component
+	}
+	return components, nil
 }
 
 func (s *SonarClient) GetComponent(key string) (*Component, error) {
