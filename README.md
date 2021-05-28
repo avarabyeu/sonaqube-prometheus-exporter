@@ -58,5 +58,8 @@ Usage of bin/sonarqube-prometheus-exporter:
 or with environment variables
 
 ```sh
-  docker run -p 8080:8080 -e PORT=8080 -e SONAR_URL=<sonar-url> -e SONAR_USER=<sonar-user> -e SONAR_PASSWORD=<sonar-password> ghcr.io/fleetframework/sonarqube-prometheus-exporter:v0.0.3
+  docker run -p 8080:8080 -e PORT=8080 -e SONAR_URL=<sonar-url> \
+  -e SONAR_USER=<sonar-user> \
+  -e SONAR_PASSWORD=<sonar-password> \
+  ghcr.io/fleetframework/sonarqube-prometheus-exporter:v0.0.4
 ```
