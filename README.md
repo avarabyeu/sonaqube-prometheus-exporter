@@ -11,39 +11,43 @@
 Usage of bin/sonarqube-prometheus-exporter:
   -help
         Show help
-  -version
-        Show version
+  -labels string
+        Static labels to be added to all metrics. In form 'label1=labelvalue,label2=labelValue'
+  -log string
+        Logging level, e.g. debug,info. Default: debug (default "info")
   -metrics-ns string
         Prometheus metrics namespace. Default: sonar (default "sonar")
+  -password string
+        Required. Sonarqube Password
+  -port string
+        Exporter port. Default 8080 (default "8080")
+  -scrape-timeout string
+        Metrics scraper timeout. Default: 1m (default "1m")
+  -tag-keys string
+        List of tag keys to be used as metric labels
+  -tag-separator string
+        Tag Separator. For instance, for Sonar project with tag 'key#value', Prometheus will have label {project="my-project-name"} if defined in TAG_KEYS list (default "#")
   -url string
         Required. Sonarqube URL
   -user string
         Required. Sonarqube User
-  -password string
-        Required. Sonarqube Password
-  -port string
-        Exporter port (default "8080")
-  -scrape-timeout string
-        Metrics scraper timeout. Default: 1m (default "1m")
-  -label-separator string
-        Label Separator. For instance, for Sonar with Label 'key#value', Prometheus attribute {project="my-project-name"} (default "#")
-  -log string
-        Logging level, e.g. debug,info. Default: debug (default "info")
-
+  -version
+        Show version
 ```
 
 ### Environment Variables
-
-| Variable Name        | Default Value | Description                                                                                                       |
-|----------------------|---------------|-------------------------------------------------------------------------------------------------------------------|
-| SONAR_URL            |               | Sonarqube URL                                                                                                     |
-| SONAR_USER           |               | Sonarqube User                                                                                                    |
-| SONAR_PASSWORD       |               | Sonarqube Password                                                                                                |
-| PORT                 | 8080          | Exporter port                                                                                                     |
-| SONAR_SCRAPE_TIMEOUT | 1m            | Metrics scraper timeout                                                                                           |
-| LABEL_SEPARATOR      | #             | Label Separator. For instance, for Sonar with Label 'key#value', Prometheus attribute {project="my-project-name"} |
-| METRICS_NAMESPACE    | sonar         | Prometheus metrics namespace                                                                                      |
-| LOGGING_LEVEL        | info          | Logging level, e.g. debug,info                                                                                    |
+| Variable Name        | Default Value | Description                                                                                               |
+|----------------------|---------------|-----------------------------------------------------------------------------------------------------------|
+| SONAR_URL            |               | Sonarqube URL                                                                                             |
+| SONAR_USER           |               | Sonarqube User                                                                                            |
+| SONAR_PASSWORD       |               | Sonarqube Password                                                                                        |
+| PORT                 | 8080          | Exporter port                                                                                             |
+| SONAR_SCRAPE_TIMEOUT | 1m            | Metrics scraper timeout                                                                                   |
+| TAG_SEPARATOR        | #             | Tag Separator. For instance, for Sonar with tag 'key#value', Prometheus label {project="my-project-name"} |
+| TAG_KEYS             |               | List of tag keys to be used as metric labels. For instance, 'module,product'                              |
+| LABELS               |               | Static labels to be added to all metrics. In form 'label1=labelvalue,label2=labelValue'                   |
+| METRICS_NAMESPACE    | sonar         | Prometheus metrics namespace                                                                              |
+| LOGGING_LEVEL        | info          | Logging level, e.g. debug,info                                                                            |
 
 ## Run As Docker Container
 
