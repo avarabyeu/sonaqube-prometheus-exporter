@@ -10,13 +10,28 @@ import (
 
 // Collector schedules measures collection and executes exporter in order to get them converted to prometheus format
 type Collector struct {
-	sonar        *SonarClient
-	exporter     *PrometheusExporter
-	tagSeparator string
+	sonar             *SonarClient
+	namespace         string
+	tagSeparator      string
+	tagLabels         []string
+	staticLabels      map[string]string
+	exportEmptyLabels bool
 }
 
-func NewCollector(sonar *SonarClient, tagSeparator, namespace string, staticLabels map[string]string, labels []string) *Collector {
-	return &Collector{sonar: sonar, tagSeparator: tagSeparator, exporter: NewPrometheusExporter(namespace, staticLabels, labels)}
+func NewCollector(
+	sonar *SonarClient,
+	tagSeparator, namespace string,
+	staticLabels map[string]string, labels []string,
+	exportEmptyLabels bool,
+) *Collector {
+	return &Collector{
+		sonar:             sonar,
+		tagSeparator:      tagSeparator,
+		namespace:         namespace,
+		tagLabels:         labels,
+		exportEmptyLabels: exportEmptyLabels,
+		staticLabels:      staticLabels,
+	}
 }
 
 func (c *Collector) Schedule(done <-chan struct{}, initialDelay, timeout time.Duration) error {
@@ -25,8 +40,10 @@ func (c *Collector) Schedule(done <-chan struct{}, initialDelay, timeout time.Du
 		return fmt.Errorf("unable to get sonar metrics: %w", err)
 	}
 
+	exporter := NewPrometheusExporter(c.namespace, c.staticLabels, c.tagLabels, c.exportEmptyLabels)
+
 	// registers metrics to be gathered
-	metricNames, err := c.exporter.InitMetrics(allMetrics)
+	metricNames, err := exporter.InitMetrics(allMetrics)
 	if err != nil {
 		return fmt.Errorf("unable to init metrics exporter: %w", err)
 	}
@@ -44,33 +61,31 @@ func (c *Collector) Schedule(done <-chan struct{}, initialDelay, timeout time.Du
 
 		// iterate over all components
 		for _, cInfo := range components {
-			go c.reportComponent(metricNames)(cInfo.Key)
+			go c.reportComponent(exporter, cInfo.Key, metricNames)
 		}
 		return nil
 	})
 	return nil
 }
 
-func (c *Collector) reportComponent(metricNames []string) func(componentKey string) {
-	return func(componentKey string) {
-		log.Debugf("Updating metrics for project: %s", componentKey)
+func (c *Collector) reportComponent(exporter *PrometheusExporter, componentKey string, metricNames []string) {
+	log.Debugf("Updating metrics for project: %s", componentKey)
 
-		// get component. Selected on each iteration since
-		// list of tags can be changed
-		component, cErr := c.sonar.GetComponent(componentKey)
-		if cErr != nil {
-			log.Errorf("unable to find component [%s]: %v", componentKey, cErr)
-		}
-
-		// get component measures to be transformed to prometheus metrics
-		measures, mErr := c.sonar.GetMeasures(component.Key, metricNames)
-		if mErr != nil {
-			log.Errorf("unable to get sonar measures: %v", mErr)
-		}
-
-		labels := c.tagsToLabels(component.Tags)
-		c.exporter.Report(component.Key, labels, measures)
+	// get component. Selected on each iteration since
+	// list of tags can be changed
+	component, cErr := c.sonar.GetComponent(componentKey)
+	if cErr != nil {
+		log.Errorf("unable to find component [%s]: %v", componentKey, cErr)
 	}
+
+	// get component measures to be transformed to prometheus metrics
+	measures, mErr := c.sonar.GetMeasures(component.Key, metricNames)
+	if mErr != nil {
+		log.Errorf("unable to get sonar measures: %v", mErr)
+	}
+
+	labels := c.tagsToLabels(component.Tags)
+	exporter.Report(component.Key, labels, measures)
 }
 
 // schedule executes action with defined timeout until receives timeout signal

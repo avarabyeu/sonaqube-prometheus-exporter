@@ -27,8 +27,9 @@ var (
 
 	labels map[string]string
 
-	tagKeys      []string
-	tagSeparator string
+	tagKeys        []string
+	tagSeparator   string
+	tagExportEmpty bool
 
 	loggingLevel string
 )
@@ -47,6 +48,7 @@ func init() {
 	var scrapeTimeoutStr string
 	var labelsStr string
 	var tagKeysStr string
+	var tagExportEmptyStr string
 
 	flag.StringVar(&port, "port", getEnv("PORT", "8080"), "Exporter port. Default 8080")
 	flag.StringVar(&scrapeTimeoutStr, "scrape-timeout", getEnv("SONAR_SCRAPE_TIMEOUT", "1m"), "Metrics scraper timeout. Default: 1m")
@@ -59,6 +61,8 @@ func init() {
 	flag.StringVar(&tagKeysStr, "tag-keys", getEnv("TAG_KEYS", ""), "List of tag keys to be used as metric labels")
 	flag.StringVar(&tagSeparator, "tag-separator", getEnv("TAG_SEPARATOR", "#"), "Tag Separator. For instance, "+
 		"for Sonar project with tag 'key#value', Prometheus will have label {project=\"my-project-name\"} if defined in TAG_KEYS list")
+	flag.StringVar(&tagExportEmptyStr, "tag-export-empty", getEnv("TAG_EXPORT_EMPTY", "TRUE"), "Export projects that does not have tags defined in 'TAG_KEYS'. "+
+		"Prometheus labels will be set to empty in this case")
 
 	flag.StringVar(&loggingLevel, "log", getEnv("LOGGING_LEVEL", "info"), "Logging level, e.g. debug,info. Default: debug")
 
@@ -100,6 +104,12 @@ func init() {
 		tagKeys = strings.Split(tagKeysStr, ",")
 	}
 
+	// parses tag keys
+	tagExportEmpty, err = strconv.ParseBool(tagExportEmptyStr)
+	if err != nil {
+		log.Fatalf("unable to parse parameter: %v", err)
+	}
+
 	// parses static prometheus metrics
 	labels, err = parseMap(labelsStr)
 	if err != nil {
@@ -139,7 +149,7 @@ func main() {
 	}()
 	go func() {
 		sonar := pkg.NewSonarClient(sonarURL, sonarUser, sonarPassword)
-		err := pkg.NewCollector(sonar, tagSeparator, metricsNamespace, labels, tagKeys).
+		err := pkg.NewCollector(sonar, tagSeparator, metricsNamespace, labels, tagKeys, tagExportEmpty).
 			Schedule(done, 0, scrapeTimeout)
 		if err != nil {
 			log.Fatalf("Unable to init metrics: %v", err)

@@ -19,11 +19,12 @@ var (
 
 // PrometheusExporter is response for converting Sonarqube metrics to Prometheus format and reporting them
 type PrometheusExporter struct {
-	metrics      map[string]*promMetric
-	mut          sync.RWMutex
-	ns           string
-	labels       []string
-	staticLabels map[string]string
+	metrics           map[string]*promMetric
+	mut               sync.RWMutex
+	ns                string
+	labels            []string
+	staticLabels      map[string]string
+	exportEmptyLabels bool
 }
 
 type promMetric struct {
@@ -32,12 +33,13 @@ type promMetric struct {
 }
 
 // NewPrometheusExporter creates new exporter instance
-func NewPrometheusExporter(ns string, staticLabels map[string]string, labels []string) *PrometheusExporter {
+func NewPrometheusExporter(ns string, staticLabels map[string]string, labels []string, exportEmptyLabels bool) *PrometheusExporter {
 	p := &PrometheusExporter{
-		ns:           ns,
-		metrics:      map[string]*promMetric{},
-		mut:          sync.RWMutex{},
-		staticLabels: staticLabels,
+		ns:                ns,
+		metrics:           map[string]*promMetric{},
+		mut:               sync.RWMutex{},
+		staticLabels:      staticLabels,
+		exportEmptyLabels: exportEmptyLabels,
 	}
 
 	// make sure names are escaped
@@ -64,7 +66,9 @@ func (pe *PrometheusExporter) Report(component string, labels map[string]string,
 	defer pe.mut.Unlock()
 
 	// adds default component name label
-	labels[componentNameLabel] = component
+	pe.fillDefaults(labels, component)
+
+	// make sure unknown labels are removed
 	pe.filterSupported(labels)
 
 	if len(labels) != len(pe.labels) {
@@ -134,6 +138,22 @@ func (pe *PrometheusExporter) filterSupported(labels map[string]string) {
 	for k := range labels {
 		if !pe.supportsLabel(k) {
 			delete(labels, k)
+		}
+	}
+}
+
+// fillDefaults adds default metrics
+func (pe *PrometheusExporter) fillDefaults(labels map[string]string, component string) {
+	// component label is default one
+	labels[componentNameLabel] = component
+
+	if pe.exportEmptyLabels {
+		// if some initial labels are not filled out, assign empty string
+		// to avoid inconsistent metric cardinality error
+		for _, l := range pe.labels {
+			if _, ok := labels[l]; !ok {
+				labels[l] = ""
+			}
 		}
 	}
 }
