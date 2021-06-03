@@ -12,7 +12,7 @@ GOFILES_NOVENDOR = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 BUILD_INFO_LDFLAGS=-ldflags "-w -extldflags '"-static"' -X main.buildDate=${BUILD_DATE} -X main.version=${COMMIT_HASH} -X main.gitRevision=${COMMIT_HASH}"
 
 build:
-	CGO_ENABLED=0 GOOS=darwin $(GO) build ${BUILD_INFO_LDFLAGS} -o ${BINARY_DIR}/${BINARY_NAME} ./
+	CGO_ENABLED=0 GOOS=linux $(GO) build ${BUILD_INFO_LDFLAGS} -o ${BINARY_DIR}/${BINARY_NAME} ./
 
 .PHONY: build
 
