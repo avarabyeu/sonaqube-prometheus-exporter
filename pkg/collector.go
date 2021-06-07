@@ -61,7 +61,14 @@ func (c *Collector) Schedule(done <-chan struct{}, initialDelay, timeout time.Du
 
 		// iterate over all components
 		for _, cInfo := range components {
-			go c.reportComponent(exporter, cInfo.Key, metricNames)
+			go func(componentKey string) {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Errorf("unable to report component: %v", r)
+					}
+				}()
+				c.reportComponent(exporter, componentKey, metricNames)
+			}(cInfo.Key)
 		}
 		return nil
 	})

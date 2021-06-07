@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"fmt"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -25,6 +26,8 @@ type PrometheusExporter struct {
 	labels            []string
 	staticLabels      map[string]string
 	exportEmptyLabels bool
+
+	componentLabels map[string]prometheus.Labels
 }
 
 type promMetric struct {
@@ -37,6 +40,7 @@ func NewPrometheusExporter(ns string, staticLabels map[string]string, labels []s
 	p := &PrometheusExporter{
 		ns:                ns,
 		metrics:           map[string]*promMetric{},
+		componentLabels:   map[string]prometheus.Labels{},
 		mut:               sync.RWMutex{},
 		staticLabels:      staticLabels,
 		exportEmptyLabels: exportEmptyLabels,
@@ -80,7 +84,6 @@ func (pe *PrometheusExporter) Report(component string, labels map[string]string,
 		pMetric, found := pe.metrics[measure.Metric]
 		if !found || pMetric == nil {
 			log.Debugf("Metric isn't found: %s", measure.Metric)
-
 			continue
 		}
 
@@ -92,6 +95,7 @@ func (pe *PrometheusExporter) Report(component string, labels map[string]string,
 		}
 
 		(*pMetric.metric).With(labels).Set(val)
+		pe.checkStaleLabels(component, pMetric, labels)
 	}
 }
 
@@ -139,6 +143,19 @@ func (pe *PrometheusExporter) filterSupported(labels map[string]string) {
 		if !pe.supportsLabel(k) {
 			delete(labels, k)
 		}
+	}
+}
+
+// checkStaleLabels
+func (pe *PrometheusExporter) checkStaleLabels(component string, metric *promMetric, labels prometheus.Labels) {
+	oldLabels, found := pe.componentLabels[component]
+	if !found {
+		pe.componentLabels[component] = labels
+		return
+	}
+	if !reflect.DeepEqual(labels, oldLabels) {
+		metric.metric.Delete(oldLabels)
+		pe.componentLabels[component] = labels
 	}
 }
 
