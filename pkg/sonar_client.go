@@ -41,7 +41,7 @@ func (s *SonarClient) GetComponent(key string) (*Component, error) {
 
 func (s *SonarClient) GetMetrics() ([]*Metric, error) {
 	var m Metrics
-	err := s.executeGet(fmt.Sprintf("%s/api/metrics/search", s.url), &m)
+	err := s.executeGet(fmt.Sprintf("%s/api/metrics/search?ps=500", s.url), &m)
 	if err != nil {
 		return nil, err
 	}

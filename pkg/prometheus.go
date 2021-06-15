@@ -111,6 +111,7 @@ func (pe *PrometheusExporter) registerMetrics(metrics []*Metric) ([]string, erro
 		}
 		if !pe.supportsMetric(m) {
 			// the metric is not supported
+			log.Debugf("Metric %s[%s] isn't supported", m.Key, m.Name)
 			continue
 		}
 		pMetric := prometheus.NewGaugeVec(
