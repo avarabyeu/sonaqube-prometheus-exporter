@@ -43,7 +43,7 @@ var (
 	helpCmd    bool
 )
 
-// nolint:gochecknoinits
+//nolint:gochecknoinits
 func init() {
 	var scrapeTimeoutStr string
 	var labelsStr string
@@ -140,7 +140,11 @@ func main() {
 
 	m := http.NewServeMux()
 	m.Handle("/metrics", promhttp.Handler())
-	server := &http.Server{Addr: fmt.Sprintf(":%s", port), Handler: m}
+	server := &http.Server{
+		Addr:        ":" + port,
+		Handler:     m,
+		ReadTimeout: 5 * time.Second,
+	}
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil {

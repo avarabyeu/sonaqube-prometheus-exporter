@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -49,7 +50,7 @@ func (c *Collector) Schedule(done <-chan struct{}, initialDelay, timeout time.Du
 	}
 	log.Debugf("Metrics to be collected\n: %s", strings.Join(metricNames, ","))
 	if len(metricNames) == 0 {
-		return fmt.Errorf("no metrics to gather detected")
+		return errors.New("no metrics to gather detected")
 	}
 
 	go c.schedule(done, initialDelay, timeout, func() error {

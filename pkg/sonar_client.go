@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -24,7 +24,7 @@ func NewSonarClient(url, user, password string) *SonarClient {
 
 func (s *SonarClient) SearchComponents() ([]*ComponentInfo, error) {
 	var c Components
-	err := s.executeGet(fmt.Sprintf("%s/api/components/search?qualifiers=TRK", s.url), &c)
+	err := s.executeGet(s.url+"/api/components/search?qualifiers=TRK", &c)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (s *SonarClient) GetComponent(key string) (*Component, error) {
 
 func (s *SonarClient) GetMetrics() ([]*Metric, error) {
 	var m Metrics
-	err := s.executeGet(fmt.Sprintf("%s/api/metrics/search?ps=500", s.url), &m)
+	err := s.executeGet(s.url+"/api/metrics/search?ps=500", &m)
 	if err != nil {
 		return nil, err
 	}
@@ -77,8 +77,8 @@ func (s *SonarClient) executeGet(u string, res interface{}) error {
 			}
 		}
 	}()
-	if rs.StatusCode >= 400 {
-		body, _ := ioutil.ReadAll(rs.Body)
+	if rs.StatusCode >= http.StatusBadRequest {
+		body, _ := io.ReadAll(rs.Body)
 		return fmt.Errorf("request failed. status code %d. Error: %s", rs.StatusCode, string(body))
 	}
 

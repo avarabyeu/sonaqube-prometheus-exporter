@@ -37,15 +37,6 @@ type promMetric struct {
 
 // NewPrometheusExporter creates new exporter instance
 func NewPrometheusExporter(ns string, staticLabels map[string]string, labels []string, exportEmptyLabels bool) *PrometheusExporter {
-	p := &PrometheusExporter{
-		ns:                ns,
-		metrics:           map[string]*promMetric{},
-		componentLabels:   map[string]prometheus.Labels{},
-		mut:               sync.RWMutex{},
-		staticLabels:      staticLabels,
-		exportEmptyLabels: exportEmptyLabels,
-	}
-
 	// make sure names are escaped
 	for i, label := range labels {
 		labels[i] = escapeName(label)
@@ -54,7 +45,16 @@ func NewPrometheusExporter(ns string, staticLabels map[string]string, labels []s
 	// adds default component name label
 	labels = append(labels, componentNameLabel)
 	sort.Strings(labels)
-	p.labels = labels
+
+	p := &PrometheusExporter{
+		ns:                ns,
+		metrics:           map[string]*promMetric{},
+		componentLabels:   map[string]prometheus.Labels{},
+		mut:               sync.RWMutex{},
+		staticLabels:      staticLabels,
+		exportEmptyLabels: exportEmptyLabels,
+		labels:            labels,
+	}
 
 	return p
 }
@@ -103,6 +103,7 @@ func (pe *PrometheusExporter) registerMetrics(metrics []*Metric) ([]string, erro
 	pe.mut.RLock()
 	defer pe.mut.RUnlock()
 
+	//nolint:prealloc
 	var mNames []string
 	for _, m := range metrics {
 		if _, ok := pe.metrics[m.Key]; ok {
