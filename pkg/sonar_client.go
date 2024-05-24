@@ -1,13 +1,14 @@
-package main
+package pkg
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"log"
+	"io"
 	"net/http"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type SonarClient struct {
@@ -21,9 +22,9 @@ func NewSonarClient(url, user, password string) *SonarClient {
 	return &SonarClient{url: strings.TrimRight(url, "/"), user: user, password: password, c: http.DefaultClient}
 }
 
-func (s *SonarClient) GetComponents() ([]*ComponentInfo, error) {
+func (s *SonarClient) SearchComponents() ([]*ComponentInfo, error) {
 	var c Components
-	err := s.executeGet(fmt.Sprintf("%s/api/components/search?qualifiers=TRK", s.url), &c)
+	err := s.executeGet(s.url+"/api/components/search?qualifiers=TRK", &c)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +41,7 @@ func (s *SonarClient) GetComponent(key string) (*Component, error) {
 
 func (s *SonarClient) GetMetrics() ([]*Metric, error) {
 	var m Metrics
-	err := s.executeGet(fmt.Sprintf("%s/api/metrics/search", s.url), &m)
+	err := s.executeGet(s.url+"/api/metrics/search?ps=500", &m)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +64,7 @@ func (s *SonarClient) executeGet(u string, res interface{}) error {
 	}
 	rq.SetBasicAuth(s.user, s.password)
 
-	log.Printf("GET [%s]", rq.URL.String())
+	log.Debugf("GET [%s]", rq.URL.String())
 
 	rs, err := s.c.Do(rq)
 	if err != nil {
@@ -72,12 +73,12 @@ func (s *SonarClient) executeGet(u string, res interface{}) error {
 	defer func() {
 		if rs.Body != nil {
 			if err := rs.Body.Close(); err != nil {
-				log.Print(err)
+				log.Error(err)
 			}
 		}
 	}()
-	if rs.StatusCode >= 400 {
-		body, _ := ioutil.ReadAll(rs.Body)
+	if rs.StatusCode >= http.StatusBadRequest {
+		body, _ := io.ReadAll(rs.Body)
 		return fmt.Errorf("request failed. status code %d. Error: %s", rs.StatusCode, string(body))
 	}
 

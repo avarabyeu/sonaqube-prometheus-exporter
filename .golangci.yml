@@ -18,7 +18,7 @@ linters-settings:
   lll:
     line-length: 160
   goimports:
-    local-prefixes: github.com/avarabyeu/sonarqube-prometheus-exporter
+    local-prefixes: github.com/fleetframework/sonarqube-prometheus-exporter
   gocritic:
     enabled-tags:
       - performance
@@ -35,28 +35,9 @@ linters-settings:
       - whyNoLint
 
 linters:
-  enable-all: true
-  disable:
-    - prealloc
-    - gochecknoglobals
-    - gocyclo
-    #    - gocritic
-    - interfacer
-    - wsl
-    - funlen
-    - unused
-    - gomnd
-    #    - maligned
-    - goerr113
-    - godot
-    - nestif
-    - nlreturn
-    - sqlclosecheck
-    - exhaustive
-    - gci
-    - exhaustivestruct
-    - godox
-    - gochecknoglobals
+  presets:
+    - bugs
+    - performance
 
 run:
   concurrency: 1

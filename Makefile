@@ -17,12 +17,12 @@ build:
 .PHONY: build
 
 lint:
-	docker run --rm -v $(CURR_DIR):/app -w /app golangci/golangci-lint:v1.32.2 golangci-lint run --enable-all --deadline 10m ./...
+	docker run --rm -v $(CURR_DIR):/app -w /app golangci/golangci-lint:v1.58.2 golangci-lint run ./...
 
 fmt:
-	gofumpt -extra -l -w -s ${GOFILES_NOVENDOR}
-	gofumports -local github.com/avarabyeu/sonarqube-prometheus-exporter -l -w ${GOFILES_NOVENDOR}
-	gci -local github.com/avarabyeu/sonarqube-prometheus-exporter -w ${GOFILES_NOVENDOR}
+	gofumpt -extra -l -w ${GOFILES_NOVENDOR}
+	goimports -local github.com/fleetframework/goga -w ${GOFILES_NOVENDOR}
+	gci write --skip-generated --section Standard --section Default --section "Prefix(github.com/fleetframework/sonarqube-prometheus-exporter)" ${GOFILES_NOVENDOR}
 
 test:
 	$(GO) test ${GODIRS_NOVENDOR}
@@ -30,9 +30,9 @@ test:
 build-image: build
 	DOCKER_BUILDKIT=1 docker build -t sonarqube-prometheus-exporter .
 
-release-image: build-image
-	DOCKER_BUILDKIT=1 docker tag sonarqube-prometheus-exporter:latest quay.io/avarabyeu/sonarqube-prometheus-exporter
-	DOCKER_BUILDKIT=1 docker push quay.io/avarabyeu/sonarqube-prometheus-exporter
-
 run:
 	realize start
+
+tag:
+	git tag ${version}
+	git push origin ${version}
